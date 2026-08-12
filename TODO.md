@@ -16,6 +16,7 @@ Priority: High
 - [x] Implement caching (cache_entries table) for conditional requests and page hashes
 - [x] Implement incremental update (merge new/changed entries into DB)
 - [x] Implement export to NDJSON and JSON aggregate formats
+- [ ] The term "index" is currently misinterpreted in places like `DESIGN.md` and therefore not currently implemented. It's not user profile, but a list of collections that the user created.
 
 Priority: Medium
 

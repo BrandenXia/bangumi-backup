@@ -74,6 +74,7 @@ Notes on extensibility
 Open questions
 
 - Which ORM to use: Prisma/Drizzle/TypeORM. Choose one during implementation with attention to bun compatibility.
+  - Currently using Drizzle.
 - Export formats to support beyond NDJSON (CSV, SQLite dump)
 
 "Small-print" on scraping ethics
