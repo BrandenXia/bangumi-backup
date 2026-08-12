@@ -1,0 +1,10 @@
+node_modules/
+bun.lockb
+.env
+.DS_Store
+dist/
+*.sqlite
+.vscode/
+.idea/
+coverage/
+/db
