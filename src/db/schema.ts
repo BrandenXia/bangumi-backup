@@ -63,6 +63,21 @@ export const userIndexes = sqliteTable(
   (table) => [index('user_indexes_user_id_idx').on(table.user_id)],
 );
 
+export const userIndexEntries = sqliteTable(
+  'user_index_entries',
+  {
+    relation_id: integer('relation_id').primaryKey(),
+    index_id: integer('index_id').notNull(),
+    target_type: text('target_type').notNull(),
+    target_id: integer('target_id').notNull(),
+    title: text('title'),
+    comment_html: text('comment_html'),
+    position: integer('position').notNull(),
+    raw: text('raw'),
+  },
+  (table) => [index('user_index_entries_index_id_idx').on(table.index_id)],
+);
+
 export const timelineEntries = sqliteTable(
   'timeline_entries',
   {

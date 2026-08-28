@@ -2,7 +2,7 @@
 
 Goal
 
-- Provide a safe, minimal-pressure backup tool for Bangumi user data: collections, blog posts, user index (profile), and timeline.
+- Provide a safe, minimal-pressure backup tool for Bangumi user data: subject collections, blog posts, user-created indexes (curated lists), profile, and timeline.
 - Use Bangumi API where possible (OpenAPI dist.json) and scrape minimally for timeline entries when API lacks coverage.
 - Store data in SQLite via an ORM to keep data structured, versionable and queryable.
 
@@ -24,15 +24,15 @@ High-level components
   - Central place to set default headers and user-agent
 
 - Bangumi API client (src/bangumi/api.ts)
-  - Loads/OpenAPI dist.json (configurable URL) and exposes typed helper functions for endpoints we need (collections, blog, user index)
+  - Loads/OpenAPI dist.json (configurable URL) and exposes typed helper functions for endpoints we need (profile and subject collections)
   - Fall back to scraping when API endpoint absent (timeline)
 
 - Scraper (src/bangumi/scraper.ts)
-  - Minimal HTML scraping for timeline feed pages
+  - Minimal HTML scraping for blog pages, user-created index lists/details, and timeline feeds when API coverage is absent
   - Respect caching (store page ETag/last-html-hash) to avoid re-parsing unchanged pages
 
 - Database / ORM layer (src/db/*)
-  - Models: User, Collection, SubjectSummary, BlogPost, TimelineEntry, CacheEntry (url, etag, lastFetched, hash)
+  - Models: User, Collection, SubjectSummary, BlogPost, UserIndex (a user-created curated list), TimelineEntry, CacheEntry (url, etag, lastFetched, hash)
   - Use an ORM to avoid handwritten SQL; migrations planned through schema file
 
 - Storage & Export (src/export.ts)
@@ -48,6 +48,8 @@ Data model (excerpt)
 - subjects: id, type, title, summary, url, updatedAt
 - blog_posts: id, userId, title, contentHtml, publishedAt, rawJson
 - timeline_entries: id, userId, sourceType, sourceId, contentHtml, createdAt
+- user_indexes: id, userId, title, contentHtml, updatedAt, raw
+- user_index_entries: relationId, indexId, targetType, targetId, title, commentHtml, position, raw
 - cache_entries: url (primary), etag, lastModified, contentHash, lastFetched
 
 Update strategy

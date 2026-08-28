@@ -14,6 +14,16 @@ export type ParsedIndexItem = {
   updatedAtMs: number | null;
 };
 
+export type ParsedIndexEntry = {
+  relationId: number;
+  targetType: string;
+  targetId: number;
+  title: string;
+  commentHtml: string | null;
+  position: number;
+  raw: string;
+};
+
 export type ParsedTimelineItem = {
   key: string;
   sourceId: string;
@@ -92,13 +102,13 @@ export function extractBlogDetailContent(html: string): string | null {
 export function parseIndexList(html: string): ParsedIndexItem[] {
   const items: ParsedIndexItem[] = [];
   const itemRegex =
-    /<li id="item_(\d+)"[\s\S]*?<a href="\/index\/\1" class="l">[\s\S]*?<h3>\s*([\s\S]*?)\s*<\/h3>[\s\S]*?<span class="time tip_i">([\s\S]*?)<\/span>[\s\S]*?<span class="desc">([\s\S]*?)<\/span>/g;
+    /<li id="item_(\d+)"[\s\S]*?<a href="\/index\/\1" class="l">[\s\S]*?<h3>\s*([\s\S]*?)\s*<\/h3>[\s\S]*?<span class="time tip_i">([\s\S]*?)<span class="desc">([\s\S]*?)<\/span>/g;
 
   let match: RegExpExecArray | null;
   while ((match = itemRegex.exec(html))) {
     const id = Number(match[1]);
     const title = normalizeText(match[2]);
-    const timeBlock = normalizeText(match[3]);
+    const timeBlock = normalizeText(match[3].replace(/<[^>]+>/g, ' '));
     const summaryHtml = match[4].trim();
     const updatedAtText =
       timeBlock.match(/更新\s+(\d{4}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2})/)?.[1] ??
@@ -110,7 +120,41 @@ export function parseIndexList(html: string): ParsedIndexItem[] {
 }
 
 export function extractIndexDetailContent(html: string): string {
-  return html;
+  const lineDetail = html.match(
+    /<div class="line_detail"[^>]*>\s*<span class="tip">([\s\S]*?)<\/span>\s*<\/div>/,
+  )?.[1];
+  return lineDetail?.trim() ?? '';
+}
+
+export function parseIndexEntries(html: string): ParsedIndexEntry[] {
+  const listHtml =
+    html.match(/<ul id="browserItemList"[^>]*>([\s\S]*?)<\/ul>/)?.[1] ?? '';
+  const entries: ParsedIndexEntry[] = [];
+  const itemRegex =
+    /<li id="item_\d+"[^>]*attr-index-related="(\d+)"[^>]*>([\s\S]*?)(?=<li id="item_\d+"|$)/g;
+
+  let match: RegExpExecArray | null;
+  while ((match = itemRegex.exec(listHtml))) {
+    const raw = match[2];
+    const target = raw.match(
+      /<a href="\/(subject|character|person|ep|blog)\/(\d+)"[^>]*class="[^"]*\bl\b[^"]*"[^>]*>([\s\S]*?)<\/a>/,
+    );
+    if (!target) continue;
+
+    const comment = raw.match(
+      /<div class="text_main_(?:even|odd)"><div class="text">([\s\S]*?)<\/div>/,
+    )?.[1];
+    entries.push({
+      relationId: Number(match[1]),
+      targetType: target[1],
+      targetId: Number(target[2]),
+      title: normalizeText(target[3].replace(/<[^>]+>/g, ' ')),
+      commentHtml: comment?.trim() || null,
+      position: entries.length,
+      raw: match[0],
+    });
+  }
+  return entries;
 }
 
 export function parseTimelineRss(xml: string): ParsedTimelineItem[] {

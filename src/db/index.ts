@@ -78,6 +78,18 @@ function migrate(conn: Database): void {
     );
     CREATE INDEX IF NOT EXISTS user_indexes_user_id_idx ON user_indexes(user_id);
 
+    CREATE TABLE IF NOT EXISTS user_index_entries (
+      relation_id INTEGER PRIMARY KEY,
+      index_id INTEGER NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id INTEGER NOT NULL,
+      title TEXT,
+      comment_html TEXT,
+      position INTEGER NOT NULL,
+      raw TEXT
+    );
+    CREATE INDEX IF NOT EXISTS user_index_entries_index_id_idx ON user_index_entries(index_id);
+
     CREATE TABLE IF NOT EXISTS timeline_entries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       entry_key TEXT NOT NULL,

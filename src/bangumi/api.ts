@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, notInArray } from 'drizzle-orm';
 import type { Config } from '../config.js';
 import { loadConfig } from '../config.js';
 import { getDb } from '../db/index.js';
@@ -7,6 +7,7 @@ import {
   cacheEntries,
   collections,
   timelineEntries,
+  userIndexEntries,
   userIndexes,
   users,
 } from '../db/schema.js';
@@ -15,6 +16,7 @@ import {
   extractBlogDetailContent,
   extractIndexDetailContent,
   parseBlogList,
+  parseIndexEntries,
   parseIndexList,
   parseTimelineRss,
 } from './scraper.js';
@@ -58,6 +60,48 @@ type CollectionResponse = {
     };
   }>;
 };
+
+async function syncIndexEntries(indexId: number, html: string): Promise<void> {
+  const db = getDb();
+  const entries = parseIndexEntries(html);
+  for (const entry of entries) {
+    await db
+      .insert(userIndexEntries)
+      .values({
+        relation_id: entry.relationId,
+        index_id: indexId,
+        target_type: entry.targetType,
+        target_id: entry.targetId,
+        title: entry.title,
+        comment_html: entry.commentHtml,
+        position: entry.position,
+        raw: entry.raw,
+      })
+      .onConflictDoUpdate({
+        target: userIndexEntries.relation_id,
+        set: {
+          index_id: indexId,
+          target_type: entry.targetType,
+          target_id: entry.targetId,
+          title: entry.title,
+          comment_html: entry.commentHtml,
+          position: entry.position,
+          raw: entry.raw,
+        },
+      });
+  }
+
+  const deleteWhere = entries.length
+    ? and(
+        eq(userIndexEntries.index_id, indexId),
+        notInArray(
+          userIndexEntries.relation_id,
+          entries.map((entry) => entry.relationId),
+        ),
+      )
+    : eq(userIndexEntries.index_id, indexId);
+  await db.delete(userIndexEntries).where(deleteWhere);
+}
 
 async function getCache(url: string): Promise<CacheRow | null> {
   const db = getDb();
@@ -279,7 +323,6 @@ async function backupBlogs(
         ),
       );
     const existingById = new Map(existingRows.map((row) => [row.id, row]));
-
     for (const item of list) {
       let contentHtml = item.summaryHtml;
       let rawPayload: string = JSON.stringify({
@@ -353,7 +396,12 @@ async function backupIndexes(
     const list = parseIndexList(pageResult.body);
     if (list.length === 0) break;
     const existingRows = await db
-      .select({ id: userIndexes.id })
+      .select({
+        id: userIndexes.id,
+        content_html: userIndexes.content_html,
+        updated_at: userIndexes.updated_at,
+        raw: userIndexes.raw,
+      })
       .from(userIndexes)
       .where(
         inArray(
@@ -361,16 +409,33 @@ async function backupIndexes(
           list.map((item) => item.id),
         ),
       );
-    const existingIds = new Set(existingRows.map((row) => row.id));
+    const existingById = new Map(existingRows.map((row) => [row.id, row]));
+    const existingEntryRows = await db
+      .selectDistinct({ index_id: userIndexEntries.index_id })
+      .from(userIndexEntries)
+      .where(
+        inArray(
+          userIndexEntries.index_id,
+          list.map((item) => item.id),
+        ),
+      );
+    const indexesWithEntries = new Set(
+      existingEntryRows.map((row) => row.index_id),
+    );
 
     for (const item of list) {
-      let contentHtml = item.summaryHtml;
-      let rawPayload: string = JSON.stringify({
-        source: 'index-list',
-        summaryHtml: item.summaryHtml,
-      });
+      const existing = existingById.get(item.id);
+      let contentHtml = existing?.content_html ?? item.summaryHtml;
+      let rawPayload =
+        existing?.raw ??
+        JSON.stringify({ source: 'index-list', summaryHtml: item.summaryHtml });
 
-      if (!existingIds.has(item.id)) {
+      const needsDetail =
+        !existing ||
+        !indexesWithEntries.has(item.id) ||
+        existing.raw?.includes('"source":"index-list"') ||
+        existing.updated_at !== item.updatedAtMs;
+      if (needsDetail) {
         const detailUrl = buildIndexDetailUrl(config.webBaseUrl, item.id);
         const detailResult = await fetchCachedText(detailUrl, config);
         if (
@@ -378,8 +443,10 @@ async function backupIndexes(
           detailResult.status >= 200 &&
           detailResult.status < 300
         ) {
-          contentHtml = extractIndexDetailContent(detailResult.body);
+          contentHtml =
+            extractIndexDetailContent(detailResult.body) || item.summaryHtml;
           rawPayload = detailResult.body;
+          await syncIndexEntries(item.id, detailResult.body);
         }
       }
 
@@ -405,7 +472,7 @@ async function backupIndexes(
     }
 
     const hasNext = pageResult.body.includes(`?page=${page + 1}`);
-    const allKnown = list.every((item) => existingIds.has(item.id));
+    const allKnown = list.every((item) => existingById.has(item.id));
     if (!hasNext || allKnown) break;
   }
 }

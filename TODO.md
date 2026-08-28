@@ -16,15 +16,15 @@ Priority: High
 - [x] Implement caching (cache_entries table) for conditional requests and page hashes
 - [x] Implement incremental update (merge new/changed entries into DB)
 - [x] Implement export to NDJSON and JSON aggregate formats
-- [ ] The term "index" is currently misinterpreted in places like `DESIGN.md` and therefore not currently implemented. It's not user profile, but a list of collections that the user created.
+- [x] Correct "index" to mean the curated collections a user created, and back up each index and its structured entries.
 
 Priority: Medium
 
-- [ ] Add tests for HTTP conditional requests and caching
 - [ ] Add logging and adjustable verbosity
 - [ ] Add retry/backoff and politeness delay configuration
 - [ ] Add option to fetch subject details (disabled by default)
 - [ ] Implement a lightweight server (serve) to browse backups locally (optional)
+- [ ] Add tests for HTTP conditional requests and caching
 
 Priority: Low / Future
 
