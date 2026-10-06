@@ -37,6 +37,18 @@ export const collections = sqliteTable(
   ],
 );
 
+export const subjects = sqliteTable('subjects', {
+  id: integer('id').primaryKey(),
+  type: integer('type'),
+  title: text('title'),
+  title_cn: text('title_cn'),
+  summary: text('summary'),
+  url: text('url'),
+  updated_at: integer('updated_at'),
+  last_fetched: integer('last_fetched'),
+  raw: text('raw'),
+});
+
 export const blogPosts = sqliteTable(
   'blog_posts',
   {

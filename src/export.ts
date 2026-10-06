@@ -4,6 +4,7 @@ import {
   blogPosts,
   cacheEntries,
   collections,
+  subjects,
   timelineEntries,
   userIndexEntries,
   userIndexes,
@@ -13,6 +14,7 @@ import {
 type RecordType =
   | 'user'
   | 'collection'
+  | 'subject'
   | 'blog_post'
   | 'user_index'
   | 'user_index_entry'
@@ -38,6 +40,9 @@ export async function exportNdjson(
 
   const collectionRows = await db.select().from(collections);
   for (const row of collectionRows) writeRecord(stream, 'collection', row);
+
+  const subjectRows = await db.select().from(subjects);
+  for (const row of subjectRows) writeRecord(stream, 'subject', row);
 
   const blogRows = await db.select().from(blogPosts);
   for (const row of blogRows) writeRecord(stream, 'blog_post', row);
@@ -68,6 +73,7 @@ export async function exportJson(
   const data = {
     users: await db.select().from(users),
     collections: await db.select().from(collections),
+    subjects: await db.select().from(subjects),
     blog_posts: await db.select().from(blogPosts),
     user_indexes: await db.select().from(userIndexes),
     user_index_entries: await db.select().from(userIndexEntries),

@@ -45,7 +45,7 @@ Data model (excerpt)
 
 - users: id, username, displayName, rawProfileJson, lastFetched
 - collections: id, userId, subjectId, status, rating, comment, lastUpdated
-- subjects: id, type, title, summary, url, updatedAt
+- subjects: id, type, title, titleCn, summary, url, updatedAt, lastFetched, raw
 - blog_posts: id, userId, title, contentHtml, publishedAt, rawJson
 - timeline_entries: id, userId, sourceType, sourceId, contentHtml, createdAt
 - user_indexes: id, userId, title, contentHtml, updatedAt, raw
@@ -57,6 +57,10 @@ Update strategy
 - For API endpoints support conditional GET with ETag/Last-Modified. If 304, update timestamps only.
 - For timeline scraping, compute a stable entry ID (e.g., hash of link + timestamp). Store latest page processed and stop at known items.
 - Avoid per-episode collection detail updates by default. Allow an optional flag to fetch details on-demand.
+- Save the subject summary embedded in each collection response without additional
+  subject requests. Backfill the subjects table from existing collection JSON when
+  opening an older database. The embedded `short_summary` is stored as `summary`;
+  `updatedAt` stays null unless the API supplies a subject update timestamp.
 
 Config
 

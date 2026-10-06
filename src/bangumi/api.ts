@@ -6,6 +6,7 @@ import {
   blogPosts,
   cacheEntries,
   collections,
+  subjects,
   timelineEntries,
   userIndexEntries,
   userIndexes,
@@ -29,6 +30,7 @@ import {
   buildUserBlogUrl,
   buildUserIndexUrl,
 } from './urls.js';
+import { subjectValues, type SubjectResponse } from './subjects.js';
 
 type BackupOptions = {
   config?: Config;
@@ -55,9 +57,8 @@ type CollectionResponse = {
     rate?: number;
     comment?: string | null;
     tags?: string[];
-    subject?: {
-      id: number;
-    };
+    subject_id?: number;
+    subject?: SubjectResponse;
   }>;
 };
 
@@ -261,14 +262,37 @@ async function backupCollections(
     if (rows.length === 0) break;
 
     for (const row of rows) {
-      if (!row.subject?.id) continue;
-      const collectionKey = `${userId}:${row.subject.id}`;
+      const subjectId = row.subject_id ?? row.subject?.id;
+      if (!subjectId) continue;
+      const collectionKey = `${userId}:${subjectId}`;
+      const subject =
+        row.subject?.id === subjectId
+          ? subjectValues(row.subject, config.webBaseUrl)
+          : null;
+      if (subject) {
+        await db
+          .insert(subjects)
+          .values(subject)
+          .onConflictDoUpdate({
+            target: subjects.id,
+            set: {
+              type: subject.type,
+              title: subject.title,
+              title_cn: subject.title_cn,
+              summary: subject.summary,
+              url: subject.url,
+              updated_at: subject.updated_at,
+              last_fetched: subject.last_fetched,
+              raw: subject.raw,
+            },
+          });
+      }
       await db
         .insert(collections)
         .values({
           collection_key: collectionKey,
           user_id: userId,
-          subject_id: row.subject.id,
+          subject_id: subjectId,
           status: row.type ? String(row.type) : null,
           rating: row.rate ?? null,
           comment: row.comment ?? null,

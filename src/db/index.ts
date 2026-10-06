@@ -1,5 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
+import { subjectValues, type SubjectResponse } from '../bangumi/subjects.js';
+import { loadConfig } from '../config.js';
 import * as schema from './schema.js';
 
 const SQLITE_COLUMN_NAME_KEY = 'name';
@@ -33,7 +35,7 @@ function ensureColumn(
   }
 }
 
-function migrate(conn: Database): void {
+function migrate(conn: Database, webBaseUrl: string): void {
   conn.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY,
@@ -57,6 +59,18 @@ function migrate(conn: Database): void {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS collections_collection_key_uq ON collections(collection_key);
     CREATE INDEX IF NOT EXISTS collections_user_id_idx ON collections(user_id);
+
+    CREATE TABLE IF NOT EXISTS subjects (
+      id INTEGER PRIMARY KEY,
+      type INTEGER,
+      title TEXT,
+      title_cn TEXT,
+      summary TEXT,
+      url TEXT,
+      updated_at INTEGER,
+      last_fetched INTEGER,
+      raw TEXT
+    );
 
     CREATE TABLE IF NOT EXISTS blog_posts (
       id INTEGER PRIMARY KEY,
@@ -116,9 +130,57 @@ function migrate(conn: Database): void {
   ensureColumn(conn, 'collections', 'raw TEXT', 'raw');
   ensureColumn(conn, 'timeline_entries', 'entry_key TEXT', 'entry_key');
   ensureColumn(conn, 'blog_posts', 'raw TEXT', 'raw');
+
+  const missingSubjects = conn
+    .query(
+      `
+      SELECT c.subject_id, c.raw
+      FROM collections AS c
+      LEFT JOIN subjects AS s ON s.id = c.subject_id
+      WHERE s.id IS NULL AND c.raw IS NOT NULL
+    `,
+    )
+    .all() as Array<{ subject_id: number; raw: string }>;
+  if (missingSubjects.length > 0) {
+    const insertSubject = conn.prepare(`
+      INSERT OR IGNORE INTO subjects
+        (id, type, title, title_cn, summary, url, updated_at, last_fetched, raw)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    conn.transaction(() => {
+      for (const collection of missingSubjects) {
+        try {
+          const subject = (
+            JSON.parse(collection.raw) as {
+              subject?: SubjectResponse;
+            }
+          ).subject;
+          if (!subject || subject.id !== collection.subject_id) continue;
+          const values = subjectValues(subject, webBaseUrl);
+          if (!values) continue;
+          insertSubject.run(
+            values.id,
+            values.type,
+            values.title,
+            values.title_cn,
+            values.summary,
+            values.url,
+            values.updated_at,
+            values.last_fetched,
+            values.raw,
+          );
+        } catch (error) {
+          if (!(error instanceof SyntaxError)) throw error;
+        }
+      }
+    })();
+  }
 }
 
-export function ensureDb(path = './bangumi-backup.sqlite'): AppDb {
+export function ensureDb(
+  path = './bangumi-backup.sqlite',
+  webBaseUrl = loadConfig().webBaseUrl,
+): AppDb {
   if (dbInstance && sqliteInstance && dbPathInstance === path)
     return dbInstance;
 
@@ -127,7 +189,7 @@ export function ensureDb(path = './bangumi-backup.sqlite'): AppDb {
   }
 
   const conn = new Database(path, { create: true });
-  migrate(conn);
+  migrate(conn, webBaseUrl);
 
   sqliteInstance = conn;
   dbPathInstance = path;

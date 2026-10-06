@@ -17,7 +17,7 @@ program
   .action((options) => {
     const config = loadConfig();
     const dbPath = options.db ?? config.dbPath;
-    ensureDb(dbPath);
+    ensureDb(dbPath, config.webBaseUrl);
     console.log(`Initialized database at ${dbPath}`);
   });
 
@@ -29,7 +29,7 @@ program
   .action(async (user, options) => {
     const config = loadConfig();
     const dbPath = options.db ?? config.dbPath;
-    ensureDb(dbPath);
+    ensureDb(dbPath, config.webBaseUrl);
     await backupUser(user, { config: { ...config, dbPath } });
     console.log(`Backup completed for ${user}`);
   });
@@ -42,7 +42,7 @@ program
   .action(async (user, options) => {
     const config = loadConfig();
     const dbPath = options.db ?? config.dbPath;
-    ensureDb(dbPath);
+    ensureDb(dbPath, config.webBaseUrl);
     await backupUser(user, { config: { ...config, dbPath } });
     console.log(`Update completed for ${user}`);
   });
@@ -56,7 +56,7 @@ program
   .action(async (options) => {
     const config = loadConfig();
     const dbPath = options.db ?? config.dbPath;
-    ensureDb(dbPath);
+    ensureDb(dbPath, config.webBaseUrl);
     if (options.format === 'json') {
       await exportJson(options.out);
     } else {
